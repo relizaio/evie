@@ -1,0 +1,26 @@
+name: Build for GAE
+on: [push]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Build and submit release
+        run: |
+          # Build a docker container
+          docker build -t reliza-hub-landing .
+          # Extract actual app from container
+          docker create --name reliza-hub-landing-container reliza-hub-landing
+          docker cp reliza-hub-landing-container://usr/share/nginx/html deployment
+          # inject app yaml for google app engine
+          cp app.yaml deployment/
+      - uses: actions-hub/gcloud@master
+        env:
+          PROJECT_ID: ${{secrets.GCLOUD_PROJECT_ID}}
+          APPLICATION_CREDENTIALS: ${{secrets.GOOGLE_APPLICATION_CREDENTIALS}}
+        with:
+          args: app deploy deployment/app.yaml
