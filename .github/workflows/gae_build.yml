@@ -12,10 +12,10 @@ jobs:
       - name: Build and submit release
         run: |
           # Build a docker container
-          docker build -t reliza-hub-landing .
+          docker build -t evie-landing .
           # Extract actual app from container
-          docker create --name reliza-hub-landing-container reliza-hub-landing
-          docker cp reliza-hub-landing-container://usr/share/nginx/html deployment
+          docker create --name evie-landing-container evie-landing
+          docker cp evie-landing-container://usr/share/nginx/html deployment
           # inject app yaml for google app engine
           cp app.yaml deployment/
       - uses: actions-hub/gcloud@master
