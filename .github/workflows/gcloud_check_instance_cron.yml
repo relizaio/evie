@@ -1,0 +1,27 @@
+name: gcloud check instance cron
+on:
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    - cron:  '15 11 * * *'
+
+jobs:
+  deploy:
+    name: Verify Version
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Retrieve version deployed to google app engine
+        uses: actions-hub/gcloud@master
+        env:
+          PROJECT_ID: ${{secrets.GCLOUD_PROJECT_ID}}
+          APPLICATION_CREDENTIALS: ${{secrets.GOOGLE_APPLICATION_CREDENTIALS}}
+        with:
+          args: app versions list | grep ' 1.00 ' | awk '{print $2}' > deployed_version
+      - name: Send instance data to Reliza Hub instance
+        run: |
+          # debug - show deployed version
+          cat deployed_version
+          # send data
+          docker run --rm relizaio/reliza-go-client instdata \
+            -i ${{ secrets.RELIZA_API_INSTANCE_ID }} -k ${{ secrets.RELIZA_API_INSTANCE_KEY }} \
+            --images "version:$(cat deployed_version)"

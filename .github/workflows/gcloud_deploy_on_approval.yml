@@ -36,3 +36,11 @@ jobs:
           APPLICATION_CREDENTIALS: ${{secrets.GOOGLE_APPLICATION_CREDENTIALS}}
         with:
           args: app versions list | grep ' 1.00 ' | awk '{print $2}' > deployed_version
+      - name: Send instance data to Reliza Hub instance
+        run: |
+          # debug - show deployed version
+          cat deployed_version
+          # send data
+          docker run --rm relizaio/reliza-go-client instdata \
+            -i ${{ secrets.RELIZA_API_INSTANCE_ID }} -k ${{ secrets.RELIZA_API_INSTANCE_KEY }} \
+            --images "version:$(cat deployed_version)"
