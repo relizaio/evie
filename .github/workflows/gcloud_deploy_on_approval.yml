@@ -1,0 +1,38 @@
+name: gcloud deploy on approval
+on:
+  repository_dispatch:
+    types: [reliza-build-event]
+
+jobs:
+  deploy:
+    name: Promote
+    runs-on: ubuntu-latest
+    env:
+      RELIZA_PROJECT_ID: 5c1d1fa0-26a8-4c87-8e4a-e83061d4160a
+
+    steps:
+      - name: Retrieve production approved version
+        run: |
+          reliza_ver=$(docker run --rm relizaio/reliza-go-client    \
+            getlatestrelease    \
+            -i ${{ secrets.RELIZA_API_PROJECT_ID }}    \
+            -k ${{ secrets.RELIZA_API_PROJECT_KEY }}    \
+            --project $RELIZA_PROJECT_ID    \
+            --branch master    \
+            --env PRODUCTION)
+          google_ver=$(echo $reliza_ver | jq -r ".artifactDetails[0].version")
+          echo "::set-env name=GOOGLE_VERSION::$google_ver"
+      - name: Switch App Engine Traffic to new version
+        uses: actions-hub/gcloud@master
+        env:
+          PROJECT_ID: ${{secrets.GCLOUD_PROJECT_ID}}
+          APPLICATION_CREDENTIALS: ${{secrets.GOOGLE_APPLICATION_CREDENTIALS}}
+        with:
+          args: app services set-traffic --splits $GOOGLE_VERSION=1 --quiet
+      - name: Retrieve version deployed to google app engine
+        uses: actions-hub/gcloud@master
+        env:
+          PROJECT_ID: ${{secrets.GCLOUD_PROJECT_ID}}
+          APPLICATION_CREDENTIALS: ${{secrets.GOOGLE_APPLICATION_CREDENTIALS}}
+        with:
+          args: app versions list | grep ' 1.00 ' | awk '{print $2}' > deployed_version
