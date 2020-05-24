@@ -7,6 +7,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Record build start
+        run: echo "::set-env name=BUILD_START::$(date -Iseconds)"
       - name: Checkout
         uses: actions/checkout@v2
       - name: Build and submit release
@@ -23,4 +25,23 @@ jobs:
           PROJECT_ID: ${{secrets.GCLOUD_PROJECT_ID}}
           APPLICATION_CREDENTIALS: ${{secrets.GOOGLE_APPLICATION_CREDENTIALS}}
         with:
-          args: app deploy deployment/app.yaml
+          args: app deploy deployment/app.yaml --no-promote > result_of_deployment 2>&1
+      - name: Submit metadata to Reliza Hub
+        run: |
+          # list results of dpeloyment for debug purposes
+          cat result_of_deployment
+          # get google app engine version which we would use as digest also
+          google_ver=$(cat result_of_deployment | grep version | cut -d '[' -f 2 | sed "s/]//")
+          echo $google_ver
+          # get target url
+          target_url=$(cat result_of_deployment | grep 'target url' | cut -d '[' -f 2 | sed "s/]//")
+          # compute build end time
+          build_end=$(date -Iseconds)
+          # submit release details to RELIZA HUB
+          # artifact here is Google App Engine deployment
+          docker run --rm relizaio/reliza-go-client addrelease -b $GITHUB_REF --commit $GITHUB_SHA -v $google_ver \
+            -i ${{ secrets.RELIZA_API_PROJECT_ID }} -k ${{ secrets.RELIZA_API_PROJECT_KEY }} \
+            --date $(git log -1 --date=iso-strict --pretty='%ad') --endpoint $target_url \
+            --artid google-app-engine-deployment-$google_ver --artbuildid github$GITHUB_ACTION$GITHUB_SHA --artcimeta GitHub Actions \
+            --arttype Application --artdigests version:$google_ver --datestart $BUILD_START --dateend $build_end --artversion $google_ver \
+            --tagkey deployment --tagval true
